@@ -34,10 +34,17 @@ def svm_loss_naive(W, X, y, reg):
       margin = scores[j] - correct_class_score + 1 # note delta = 1
       if margin > 0:
         loss += margin
+        dW[:, y[i]] -= X[i]  # grad corresponds to the correct class row
+        dW[:, j] += X[i] #grad corresponds to the other rows
 
   # Right now the loss is a sum over all training examples, but we want it
   # to be an average instead so we divide by num_train.
   loss /= num_train
+
+  # Averaging over all training examples and adding reg term
+  dW /= num_train
+  dW += 2 * reg * W
+
 
   # Add regularization to the loss.
   loss += reg * np.sum(W * W)
@@ -69,7 +76,19 @@ def svm_loss_vectorized(W, X, y, reg):
   # Implement a vectorized version of the structured SVM loss, storing the    #
   # result in loss.                                                           #
   #############################################################################
-  pass
+  num_train = X.shape[0]
+  loss = 0.0
+
+  scores = X.dot(W)
+  correct_class_score = scores[np.arange(num_train), y]
+  margin = (scores.T - correct_class_score + 1).T
+  margin[np.arange(num_train), y] = 0
+  positive_margins = margin[margin > 0]
+
+  loss += positive_margins.sum()
+  loss /= num_train
+
+  loss += reg * np.sum(W * W)
   #############################################################################
   #                             END OF YOUR CODE                              #
   #############################################################################
@@ -84,7 +103,16 @@ def svm_loss_vectorized(W, X, y, reg):
   # to reuse some of the intermediate values that you used to compute the     #
   # loss.                                                                     #
   #############################################################################
-  pass
+
+  #each i-th element of the column of the indicator matrix is coefficient of x_i
+  #in the sum of all training examples
+  indicator = np.zeros(margin.shape)
+
+  indicator[margin > 0] = 1
+  indicator[np.arange(num_train), y] = -np.sum(indicator, axis=1) #corresponds to the correct class row
+
+  dW = X.T.dot(indicator) / num_train
+  dW += 2 * reg * W
   #############################################################################
   #                             END OF YOUR CODE                              #
   #############################################################################
