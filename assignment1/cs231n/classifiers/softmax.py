@@ -86,12 +86,10 @@ def softmax_loss_vectorized(W, X, y, reg):
   loss /= num_training
   loss += reg * np.sum(W * W)
 
-  # each i-th element of the column of the indicator matrix is coefficient of x_i
-  # in the sum of all training examples
-  indicator = probabilities.copy()
-  indicator[np.arange(num_training), y] -= 1
+  dscores = probabilities.copy()
+  dscores[np.arange(num_training), y] -= 1
 
-  dW += X.T.dot(indicator)
+  dW += X.T.dot(dscores)
   dW /= num_training
   dW += reg * 2 * W
   #############################################################################
