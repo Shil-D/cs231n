@@ -258,25 +258,37 @@ class FullyConnectedNet(object):
         ############################################################################
         L = self.num_layers
         caches = {}
+        dropout_caches = {}
 
         if self.normalization=='batchnorm':
+            op = affine_batchnorm_relu_forward
+        else:
+            op = affine_relu_forward
+
+        if self.normalization == 'batchnorm':
             hiddenLayer, caches[1] = affine_batchnorm_relu_forward(X, self.params['W1'], self.params['b1'], \
-                                                                   self.params['gamma1'], self.params['betta1'],\
-                                                                   self.bn_params[0])
+                                                               self.params['gamma1'], self.params['betta1'],\
+                                                               self.bn_params[0])
+            if self.use_dropout:
+                hiddenLayer, dropout_caches[1] = dropout_forward(hiddenLayer, self.dropout_param)
 
             for i in range(2, L):
-                hiddenLayer, caches[i] = affine_batchnorm_relu_forward(hiddenLayer,
-                                                                self.params['W'+str(i)], self.params['b'+str(i)], \
-                                                                self.params['gamma'+str(i)], self.params['betta'+str(i)], \
-                                                                self.bn_params[i-1])
-
+                hiddenLayer, caches[i] = op(hiddenLayer,
+                                                        self.params['W'+str(i)], self.params['b'+str(i)], \
+                                                        self.params['gamma'+str(i)], self.params['betta'+str(i)], \
+                                                        self.bn_params[i-1])
+                if self.use_dropout:
+                    hiddenLayer, dropout_caches[i] = dropout_forward(hiddenLayer, self.dropout_param)
         else:
             hiddenLayer, caches[1] = affine_relu_forward(X, self.params['W1'], self.params['b1'])
+            if self.use_dropout:
+                hiddenLayer, dropout_caches[1] = dropout_forward(hiddenLayer, self.dropout_param)
 
             for i in range(2, L):
-                hiddenLayer, caches[i] = affine_relu_forward(hiddenLayer,
-                                                                       self.params['W' + str(i)],
-                                                                       self.params['b' + str(i)])
+                hiddenLayer, caches[i] = op(hiddenLayer,
+                                            self.params['W' + str(i)], self.params['b' + str(i)])
+                if self.use_dropout:
+                    hiddenLayer, dropout_caches[i] = dropout_forward(hiddenLayer, self.dropout_param)
 
         scores, caches[L] = affine_forward(hiddenLayer,
                                            self.params['W' + str(L)], self.params['b' + str(L)])
@@ -310,13 +322,17 @@ class FullyConnectedNet(object):
 
         if self.normalization == 'batchnorm':
             for i in range(L-1, 0, -1):
+                if self.use_dropout:
+                    dX = dropout_backward(dX, dropout_caches[i])
                 dX, grads['W'+str(i)], grads['b'+str(i)], \
-                    grads['gamma' + str(i)], grads['betta'+str(i)]= affine_batchnorm_relu_backward(dX, caches[i])
+                    grads['gamma' + str(i)], grads['betta'+str(i)] = affine_batchnorm_relu_backward(dX, caches[i])
                 loss += 0.5 * self.reg * np.sum(self.params['W' + str(i)] ** 2)
                 grads['W' + str(i)] += self.reg * self.params['W' + str(i)]
 
         else:
             for i in range(L-1, 0, -1):
+                if self.use_dropout:
+                    dX = dropout_backward(dX, dropout_caches[i])
                 dX, grads['W'+str(i)], grads['b'+str(i)] = affine_relu_backward(dX, caches[i])
                 loss += 0.5 * self.reg * np.sum(self.params['W' + str(i)] ** 2)
                 grads['W' + str(i)] += self.reg * self.params['W' + str(i)]
